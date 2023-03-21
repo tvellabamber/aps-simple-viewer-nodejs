@@ -1,4 +1,6 @@
 /// import * as Autodesk from "@types/forge-viewer";
+import './extensions/Edit2dExtension/contents/main.js';
+import './extensions/TransformExtension/contents/main.js';
 
 async function getAccessToken(callback) {
     try {
@@ -22,7 +24,7 @@ export function initViewer(container) {
             };
             const viewer = new Autodesk.Viewing.GuiViewer3D(container, config);
             viewer.start();
-            viewer.setTheme('light-theme');
+            viewer.setTheme('dark-theme');
             resolve(viewer);
         });
     });
@@ -32,6 +34,9 @@ export function loadModel(viewer, urn) {
     return new Promise(function (resolve, reject) {
         function onDocumentLoadSuccess(doc) {
             resolve(viewer.loadDocumentNode(doc, doc.getRoot().getDefaultGeometry()));
+            viewer.loadExtension("Edit2dExtension");
+            viewer.loadExtension("TransformationExtension");
+
         }
         function onDocumentLoadFailure(code, message, errors) {
             reject({ code, message, errors });
