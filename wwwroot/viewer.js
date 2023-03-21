@@ -33,7 +33,12 @@ export function initViewer(container) {
 export function loadModel(viewer, urn) {
     return new Promise(function (resolve, reject) {
         function onDocumentLoadSuccess(doc) {
-            resolve(viewer.loadDocumentNode(doc, doc.getRoot().getDefaultGeometry()));
+            // doc.getRoot().getDefaultGeometry()
+            let geom = doc.getRoot().search(
+                { role: '2d', type: 'geometry' }
+            )
+            resolve(viewer.loadDocumentNode(doc, geom[0], { keepCurrentModels: true }, { preserveView: true }));
+            
             viewer.loadExtension("Edit2dExtension");
             viewer.loadExtension("TransformationExtension");
 
@@ -44,4 +49,6 @@ export function loadModel(viewer, urn) {
         viewer.setLightPreset(0);
         Autodesk.Viewing.Document.load('urn:' + urn, onDocumentLoadSuccess, onDocumentLoadFailure);
     });
+
+    
 }
