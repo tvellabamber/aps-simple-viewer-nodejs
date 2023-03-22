@@ -1,4 +1,4 @@
-import { initViewer, loadModel } from './viewer.js';
+import { initViewer, loadBaseModel, loadSecondaryModel} from './viewer.js';
 
 initViewer(document.getElementById('preview')).then(viewer => {
     const urn = window.location.hash?.substring(1);
@@ -7,7 +7,8 @@ initViewer(document.getElementById('preview')).then(viewer => {
 });
 
 async function setupModelSelection(viewer, selectedUrn) {
-    const dropdown = document.getElementById('models');
+    const dropdown = document.getElementById('basemodels');
+    const dropdown2 = document.getElementById('secmodels');
     dropdown.innerHTML = '';
     try {
         const resp = await fetch('/api/models');
@@ -20,6 +21,11 @@ async function setupModelSelection(viewer, selectedUrn) {
         if (dropdown.value) {
             onModelSelected(viewer, dropdown.value);
         }
+        dropdown2.innerHTML = models.map(model => `<option value=${model.urn} ${model.urn === selectedUrn ? 'selected' : ''}>${model.name}</option>`).join('\n');
+        dropdown2.onchange = () => onModelSelected2(viewer, dropdown2.value);
+        if (dropdown2.value) {
+            onModelSelected2(viewer, dropdown2.value);
+        }
     } catch (err) {
         alert('Could not list models. See the console for more details.');
         console.error(err);
@@ -29,7 +35,7 @@ async function setupModelSelection(viewer, selectedUrn) {
 async function setupModelUpload(viewer) {
     const upload = document.getElementById('upload');
     const input = document.getElementById('input');
-    const models = document.getElementById('models');
+    const models = document.getElementById('basemodels');
     upload.onclick = () => input.click();
     input.onchange = async () => {
         const file = input.files[0];
@@ -86,7 +92,8 @@ async function onModelSelected(viewer, urn) {
                 break;
             default:
                 clearNotification();
-                loadModel(viewer, urn);
+                window.baseModel = await loadBaseModel(viewer, urn);
+                
                 break; 
         }
     } catch (err) {
@@ -94,6 +101,41 @@ async function onModelSelected(viewer, urn) {
         console.error(err);
     }
 }
+async function onModelSelected2(viewer, urn) {
+    if (window.onModelSelected2Timeout) {
+        clearTimeout(window.onModelSelected2Timeout);
+        delete window.onModelSelected2Timeout;
+    }
+    window.location.hash = urn;
+    try {
+        const resp = await fetch(`/api/models/${urn}/status`);
+        if (!resp.ok) {
+            throw new Error(await resp.text());
+        }
+        const status = await resp.json();
+        switch (status.status) {
+            case 'n/a':
+                showNotification(`Model has not been translated.`);
+                break;
+            case 'inprogress':
+                showNotification(`Model is being translated (${status.progress})...`);
+                window.onModelSelected2Timeout = setTimeout(onModelSelected2, 5000, viewer, urn);
+                break;
+            case 'failed':
+                showNotification(`Translation failed. <ul>${status.messages.map(msg => `<li>${JSON.stringify(msg)}</li>`).join('')}</ul>`);
+                break;
+            default:
+                clearNotification();
+                window.secondaryModel = await loadSecondaryModel(viewer, urn);
+                
+                break; 
+        }
+    } catch (err) {
+        alert('Could not load model. See the console for more details.');
+        console.error(err);
+    }
+}
+
 
 function showNotification(message) {
     const overlay = document.getElementById('overlay');
@@ -105,4 +147,25 @@ function clearNotification() {
     const overlay = document.getElementById('overlay');
     overlay.innerHTML = '';
     overlay.style.display = 'none';
+}
+
+document.onmousemove = event => {
+    if (!event.ctrlKey || !window.viewer || !window.baseModel || !window.secondaryModel)
+        return;
+
+    let res = window.viewer.impl.hitTest(event.clientX, event.clientY, true, null, [window.baseModel.getModelId()]);
+    let pt = null;
+    
+    if (res) {
+        pt = res.intersectPoint;
+    } else {
+        pt = window.viewer.impl.intersectGround(event.clientX, event.clientY);
+    }
+    
+    let tr = window.secondaryModel.getPlacementTransform();
+    tr.elements[12] = pt.x;
+    tr.elements[13] = pt.y;
+    //tr.elements[14] = pt.z + extraZ;
+    window.secondaryModel.setPlacementTransform(tr);
+    window.viewer.impl.invalidate(true, true, true);
 }
