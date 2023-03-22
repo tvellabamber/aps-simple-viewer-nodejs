@@ -22,26 +22,24 @@ export function initViewer(container) {
             const config = {
                 extensions: ['Autodesk.DocumentBrowser']
             };
-            const viewer = new Autodesk.Viewing.GuiViewer3D(container, config);
-            viewer.start();
-            viewer.setTheme('dark-theme');
-            resolve(viewer);
+            window.viewer = new Autodesk.Viewing.GuiViewer3D(container, config);
+            window.viewer.start();
+            window.viewer.setTheme('dark-theme');
+            resolve(window.viewer);
         });
     });
 }
 
-export function loadModel(viewer, urn) {
+export function loadBaseModel(viewer, urn) {
     return new Promise(function (resolve, reject) {
         function onDocumentLoadSuccess(doc) {
             // doc.getRoot().getDefaultGeometry()
             let geom = doc.getRoot().search(
                 { role: '2d', type: 'geometry' }
             )
-            resolve(viewer.loadDocumentNode(doc, geom[0], { keepCurrentModels: true }, { preserveView: true }));
+            resolve(viewer.loadDocumentNode(doc, geom[0], { keepCurrentModels: false }, { preserveView: true }));
             
-            viewer.loadExtension("Edit2dExtension");
-            viewer.loadExtension("TransformationExtension");
-
+            
         }
         function onDocumentLoadFailure(code, message, errors) {
             reject({ code, message, errors });
@@ -52,3 +50,24 @@ export function loadModel(viewer, urn) {
 
     
 }
+
+export function loadSecondaryModel(viewer, urn) {
+    return new Promise(function (resolve, reject) {
+        function onDocumentLoadSuccess(doc) {
+            // doc.getRoot().getDefaultGeometry()
+            let geom = doc.getRoot().search(
+                { role: '2d', type: 'geometry' }
+            )
+            resolve(viewer.loadDocumentNode(doc, geom[0], { keepCurrentModels: true }, { preserveView: true }, {}));
+            
+        }
+        function onDocumentLoadFailure(code, message, errors) {
+            reject({ code, message, errors });
+        }
+        viewer.setLightPreset(0);
+        Autodesk.Viewing.Document.load('urn:' + urn, onDocumentLoadSuccess, onDocumentLoadFailure);
+    });
+
+    
+}
+
